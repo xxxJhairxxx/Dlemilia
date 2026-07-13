@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* Compensa el header fijo al navegar por anclas */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    @apply bg-crema text-carbon antialiased;
+    font-family: var(--font-poppins), system-ui, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  /* Foco visible y accesible para navegación por teclado */
+  :focus-visible {
+    outline: 2px solid #c89a32;
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Fondo crema plano y limpio (estilo minimalista) */
+  .bg-paper {
+    background-color: #f8f3ec;
+  }
+
+  /* Confeti pastel multicolor (banda tipo newsletter, estilo boutique) */
+  .bg-confetti {
+    background-color: #fbf7f1;
+    background-image:
+      radial-gradient(circle, rgba(200, 154, 50, 0.45) 2px, transparent 2.5px),
+      radial-gradient(circle, rgba(224, 160, 170, 0.7) 2.5px, transparent 3px),
+      radial-gradient(circle, rgba(160, 195, 160, 0.7) 2.5px, transparent 3px),
+      radial-gradient(circle, rgba(110, 15, 22, 0.14) 1.5px, transparent 2px);
+    background-position: 0 0, 25px 35px, 50px 12px, 15px 55px;
+    background-size: 80px 80px, 95px 95px, 70px 70px, 60px 60px;
+  }
+}
+
+/* Respeta la preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
