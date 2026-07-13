@@ -26,10 +26,10 @@ const SECCIONES: Seccion[] = [
     ],
   },
   {
-    titulo: "Empanada",
+    titulo: "Producto destacado",
     campos: [
-      { clave: "empanada_eyebrow", label: "Rótulo pequeño" },
-      { clave: "empanada_subtitulo", label: "Frase (ej. con café o chocolate)" },
+      { clave: "destacado_eyebrow", label: "Etiqueta (ej. Destacado, Nuevo, En promoción)" },
+      { clave: "destacado_subtitulo", label: "Frase corta bajo el nombre" },
     ],
   },
   {
@@ -38,7 +38,7 @@ const SECCIONES: Seccion[] = [
       { clave: "tortas_eyebrow", label: "Rótulo pequeño" },
       { clave: "tortas_titulo", label: "Título" },
       { clave: "tortas_subtitulo", label: "Subtítulo", area: true },
-      { clave: "tortas_mas_titulo", label: "Título de 'Más delicias'" },
+      { clave: "tortas_mas_titulo", label: "Título de 'Helados y postres'" },
     ],
   },
   {
@@ -71,9 +71,9 @@ const SECCIONES: Seccion[] = [
     titulo: "Fotos de categorías (Nuestros productos)",
     campos: [
       { clave: "cat_img_tortas", label: "Foto: Tortas", image: true },
-      { clave: "cat_img_empanadas", label: "Foto: Empanadas", image: true },
+      { clave: "cat_img_destacado", label: "Foto: Destacado", image: true },
       { clave: "cat_img_personalizadas", label: "Foto: Tortas personalizadas", image: true },
-      { clave: "cat_img_mas", label: "Foto: Más delicias", image: true },
+      { clave: "cat_img_postres", label: "Foto: Helados y postres", image: true },
     ],
   },
 ];

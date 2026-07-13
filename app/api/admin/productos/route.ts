@@ -5,7 +5,7 @@ import { upsertProducto, deleteProducto, type Categoria } from "@/lib/cms";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CATEGORIAS: Categoria[] = ["torta", "empanada", "mas"];
+const CATEGORIAS: Categoria[] = ["torta", "destacado", "mas"];
 
 function slugify(s: string): string {
   return s

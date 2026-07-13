@@ -11,7 +11,7 @@ import type { Product } from "@/types/Product";
  * Comparte la conexión libSQL/Turso con el módulo de reclamaciones.
  */
 
-export type Categoria = "torta" | "empanada" | "mas";
+export type Categoria = "torta" | "destacado" | "mas";
 
 export interface ProductoCMS extends Product {
   slug: string;
@@ -64,21 +64,21 @@ export const CONTENIDO_DEFAULT: Record<string, string> = {
   hero_eyebrow: "Sabor único, hecho con pasión",
   hero_titulo: "Productos D'lemilia",
   hero_subtitulo:
-    "Tortas artesanales, empanadas recién horneadas y pedidos personalizados, elaborados con dedicación.",
+    "Tortas artesanales, empanadas, helados y postres caseros, elaborados con dedicación para tus momentos especiales.",
 
   categorias_eyebrow: "Nuestros productos",
   categorias_titulo: "Hechos a mano, con pasión",
   categorias_subtitulo:
-    "Elaboramos cada producto de manera artesanal, en pequeñas cantidades y con los mejores ingredientes.",
+    "Elaboramos cada torta, empanada, helado y postre de manera artesanal, en pequeñas cantidades y con los mejores ingredientes.",
 
-  empanada_eyebrow: "Recién horneada",
-  empanada_subtitulo: "con café o chocolate",
+  destacado_eyebrow: "Destacado",
+  destacado_subtitulo: "Nuestro producto del momento, recién hecho para ti.",
 
   tortas_eyebrow: "Catálogo",
   tortas_titulo: "Nuestras tortas",
   tortas_subtitulo:
     "Tortas artesanales de 24 cm · 16 porciones · decoración hecha a mano. Imágenes referenciales.",
-  tortas_mas_titulo: "Más delicias artesanales",
+  tortas_mas_titulo: "Helados y postres",
 
   cta_eyebrow: "Personaliza tu torta",
   cta_titulo: "Para cada ocasión especial",
@@ -87,7 +87,7 @@ export const CONTENIDO_DEFAULT: Record<string, string> = {
 
   about_titulo: "Nuestra historia",
   about_texto:
-    "En Productos D'lemilia elaboramos cada torta y empanada de manera artesanal, utilizando ingredientes seleccionados y recetas preparadas con dedicación. Nuestro compromiso es ofrecer productos de excelente calidad para acompañar los momentos más especiales de nuestros clientes.",
+    "En Productos D'lemilia elaboramos cada torta, empanada, helado y postre de manera artesanal, utilizando ingredientes seleccionados y recetas preparadas con dedicación. Nuestro compromiso es ofrecer productos de excelente calidad para acompañar los momentos más especiales de nuestros clientes.",
 
   contacto_telefono: "942 392 993",
   contacto_horarios: "",
@@ -95,9 +95,9 @@ export const CONTENIDO_DEFAULT: Record<string, string> = {
 
   // Fotos de la fila "Nuestros productos" (categorías)
   cat_img_tortas: "/tortas/torta-crema-fresas.webp",
-  cat_img_empanadas: "/empanadas/empanada.jpg",
+  cat_img_destacado: "/empanadas/empanada.jpg",
   cat_img_personalizadas: "/tortas/personalizada.jpg",
-  cat_img_mas: "/tortas/tartaletas-fresa.webp",
+  cat_img_postres: "/tortas/tartaletas-fresa.webp",
 };
 
 async function ensureSeed(): Promise<void> {
@@ -108,7 +108,7 @@ async function ensureSeed(): Promise<void> {
   if (nProd === 0) {
     const seedAll: { arr: Product[]; categoria: Categoria }[] = [
       { arr: seedTortas, categoria: "torta" },
-      { arr: seedEmpanadas, categoria: "empanada" },
+      { arr: seedEmpanadas, categoria: "destacado" },
       { arr: seedMas, categoria: "mas" },
     ];
     const tx = await db.transaction("write");
@@ -179,7 +179,7 @@ function mapRow(r: ProductoRow): ProductoCMS {
     name: r.nombre,
     description: r.descripcion,
     price: r.precio,
-    category: r.categoria === "empanada" ? "empanada" : "torta",
+    category: "torta",
     categoria: (r.categoria as Categoria) ?? "torta",
     image: r.imagen,
     varieties: r.variedades

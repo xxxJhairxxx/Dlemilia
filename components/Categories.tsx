@@ -10,9 +10,9 @@ import { motion } from "framer-motion";
 export default function Categories({ c }: { c: Record<string, string> }) {
   const categories = [
     { label: "Tortas", href: "#tortas", image: c.cat_img_tortas },
-    { label: "Empanadas", href: "#empanadas", image: c.cat_img_empanadas },
+    { label: "Destacado", href: "#destacado", image: c.cat_img_destacado },
     { label: "Tortas personalizadas", href: "#personaliza", image: c.cat_img_personalizadas },
-    { label: "Más delicias", href: "#tortas", image: c.cat_img_mas },
+    { label: "Helados y postres", href: "#mas", image: c.cat_img_postres },
   ];
 
   return (

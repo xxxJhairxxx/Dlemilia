@@ -23,23 +23,13 @@ export function sendWhatsApp(
   variety?: string
 ): string {
   let message: string;
+  const nombre = variety ? `${product.name} (${variety})` : product.name;
 
-  if (product.category === "empanada") {
-    const nombre = variety ? `${product.name} (${variety})` : product.name;
-    message = `Hola.
-
-Quisiera pedir:
-
-• ${nombre}
-
-Cantidad: ${quantity}
-
-Muchas gracias.`;
-  } else if (product.price === null) {
+  if (product.price === null) {
     message = `Hola.
 
 Quisiera consultar por el siguiente producto:
-${product.name}
+${nombre}
 
 ¿Me podrían indicar el precio y la disponibilidad?
 
@@ -47,10 +37,9 @@ Muchas gracias.`;
   } else {
     message = `Hola.
 
-Quisiera pedir la siguiente torta.
+Quisiera pedir el siguiente producto:
 
-Producto:
-${product.name}
+• ${nombre}
 
 Cantidad: ${quantity}
 

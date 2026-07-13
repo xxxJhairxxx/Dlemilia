@@ -1,7 +1,7 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Categories from "@/components/Categories";
-import Empanadas from "@/components/Empanadas";
+import Destacado from "@/components/Destacado";
 import Tortas from "@/components/Tortas";
 import CTA from "@/components/CTA";
 import Benefits from "@/components/Benefits";
@@ -18,7 +18,7 @@ export default async function Home() {
   const c = await getContenido();
   const tortas = await getProductosPorCategoria("torta");
   const mas = await getProductosPorCategoria("mas");
-  const empanada = (await getProductosPorCategoria("empanada"))[0] ?? null;
+  const destacado = (await getProductosPorCategoria("destacado"))[0] ?? null;
 
   return (
     <WhatsAppProvider numero={c.contacto_whatsapp} display={c.contacto_telefono}>
@@ -26,7 +26,7 @@ export default async function Home() {
       <main>
         <Hero c={c} />
         <Categories c={c} />
-        {empanada && <Empanadas c={c} empanada={empanada} />}
+        {destacado && <Destacado c={c} producto={destacado} />}
         <Tortas c={c} tortas={tortas} mas={mas} />
         <CTA c={c} />
         <Benefits />

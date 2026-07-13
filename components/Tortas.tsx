@@ -27,9 +27,9 @@ export default function Tortas({
           <ProductGrid products={tortas} />
         </div>
 
-        {/* Más delicias artesanales */}
+        {/* Helados y postres */}
         {mas.length > 0 && (
-          <div className="mt-28">
+          <div id="mas" className="mt-28 scroll-mt-24">
             <SectionTitle eyebrow="También tenemos" title={c.tortas_mas_titulo} />
             <div className="mt-16">
               <ProductGrid products={mas} />

@@ -8,8 +8,8 @@ import type { ProductoAdminRow } from "@/lib/cms";
 
 const CATS: { value: string; label: string }[] = [
   { value: "torta", label: "Torta" },
-  { value: "empanada", label: "Empanada" },
-  { value: "mas", label: "Más delicias" },
+  { value: "destacado", label: "Destacado (sección resaltada)" },
+  { value: "mas", label: "Helados y postres" },
 ];
 const catLabel = (v: string) => CATS.find((c) => c.value === v)?.label ?? v;
 
