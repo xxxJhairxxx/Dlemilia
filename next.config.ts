@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // better-sqlite3 es un módulo nativo: se deja fuera del bundle del servidor
-  serverExternalPackages: ["better-sqlite3"],
+  // @libsql/client trae bindings nativos: se deja fuera del bundle del servidor
+  serverExternalPackages: ["@libsql/client"],
   images: {
     // Los placeholders del catálogo son SVG locales; permitimos su
     // optimización de forma segura (contenido propio, sin scripts).
@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
     contentDispositionType: "attachment",
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     formats: ["image/avif", "image/webp"],
+    // Imágenes subidas desde el panel admin se guardan en Vercel Blob.
+    remotePatterns: [
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+    ],
   },
 };
 

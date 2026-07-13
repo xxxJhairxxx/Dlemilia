@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   const id = b.id ? Number(b.id) : undefined;
   const slug = String(b.slug ?? "").trim() || slugify(nombre) || `producto-${Date.now()}`;
 
-  upsertProducto({
+  await upsertProducto({
     id,
     slug,
     nombre,
@@ -67,6 +67,6 @@ export async function DELETE(request: Request) {
   const id = Number(searchParams.get("id"));
   if (!Number.isInteger(id) || id <= 0)
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
-  deleteProducto(id);
+  await deleteProducto(id);
   return NextResponse.json({ ok: true });
 }

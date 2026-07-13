@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 import { isAuthenticated } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -42,11 +42,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "La imagen supera los 6 MB." }, { status: 400 });
   }
 
-  const dir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(dir, { recursive: true });
   const filename = safeName(file.name);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
+  const blob = await put(`uploads/${filename}`, file, {
+    access: "public",
+    contentType: file.type,
+  });
 
-  return NextResponse.json({ path: `/uploads/${filename}` });
+  return NextResponse.json({ path: blob.url });
 }

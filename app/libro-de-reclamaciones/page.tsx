@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default function LibroDeReclamacionesPage() {
-  const c = getContenido();
+export default async function LibroDeReclamacionesPage() {
+  const c = await getContenido();
   return (
     <WhatsAppProvider numero={c.contacto_whatsapp} display={c.contacto_telefono}>
       {/* Cabecera propia de la página */}

@@ -1,61 +1,74 @@
-import Database from "better-sqlite3";
-import path from "node:path";
+import { createClient, type Client } from "@libsql/client";
 
 /**
- * Conexión SQLite (singleton). El archivo se crea en la raíz del proyecto
- * como `reclamaciones.db`. Se reutiliza la misma conexión en desarrollo
- * para evitar abrir múltiples handles con el hot-reload.
+ * Conexión libSQL / Turso (singleton).
+ *
+ * En producción (Vercel) se usa Turso mediante las variables de entorno
+ * TURSO_DATABASE_URL y TURSO_AUTH_TOKEN. En desarrollo, si no están
+ * definidas, se cae automáticamente a un archivo SQLite local
+ * (`file:reclamaciones.db`) para poder trabajar sin configurar nada.
  */
-const DB_PATH = path.join(process.cwd(), "reclamaciones.db");
+const globalForDb = globalThis as unknown as {
+  _dlemiliaClient?: Client;
+  _dlemiliaReclInit?: Promise<void>;
+};
 
-const globalForDb = globalThis as unknown as { _dlemiliaDb?: Database.Database };
-
-function initDb(): Database.Database {
-  const db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS reclamaciones (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      correlativo  TEXT NOT NULL UNIQUE,
-      creado_en    TEXT NOT NULL,
-      nombre       TEXT NOT NULL,
-      tipo_doc     TEXT NOT NULL,
-      num_doc      TEXT NOT NULL,
-      domicilio    TEXT NOT NULL,
-      telefono     TEXT,
-      correo       TEXT NOT NULL,
-      menor        INTEGER NOT NULL DEFAULT 0,
-      apoderado    TEXT,
-      tipo_bien    TEXT NOT NULL,
-      monto        TEXT,
-      descripcion  TEXT NOT NULL,
-      tipo_reclamo TEXT NOT NULL,
-      detalle      TEXT NOT NULL,
-      pedido       TEXT NOT NULL,
-      estado       TEXT NOT NULL DEFAULT 'pendiente',
-      respuesta    TEXT,
-      respondido_en TEXT
-    )
-  `);
-
-  // Migración para bases de datos creadas antes de agregar estas columnas.
-  const cols = (db.prepare("PRAGMA table_info(reclamaciones)").all() as { name: string }[]).map(
-    (c) => c.name
-  );
-  if (!cols.includes("estado"))
-    db.exec("ALTER TABLE reclamaciones ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'");
-  if (!cols.includes("respuesta")) db.exec("ALTER TABLE reclamaciones ADD COLUMN respuesta TEXT");
-  if (!cols.includes("respondido_en"))
-    db.exec("ALTER TABLE reclamaciones ADD COLUMN respondido_en TEXT");
-
-  return db;
+export function getClient(): Client {
+  if (!globalForDb._dlemiliaClient) {
+    const url = process.env.TURSO_DATABASE_URL ?? "file:reclamaciones.db";
+    globalForDb._dlemiliaClient = createClient({
+      url,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
+  }
+  return globalForDb._dlemiliaClient;
 }
 
-export function getDb(): Database.Database {
-  if (!globalForDb._dlemiliaDb) {
-    globalForDb._dlemiliaDb = initDb();
+/** Crea la tabla de reclamaciones (una sola vez por instancia). */
+function ensureSchema(): Promise<void> {
+  if (!globalForDb._dlemiliaReclInit) {
+    globalForDb._dlemiliaReclInit = (async () => {
+      const db = getClient();
+      await db.execute(`
+        CREATE TABLE IF NOT EXISTS reclamaciones (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          correlativo  TEXT NOT NULL UNIQUE,
+          creado_en    TEXT NOT NULL,
+          nombre       TEXT NOT NULL,
+          tipo_doc     TEXT NOT NULL,
+          num_doc      TEXT NOT NULL,
+          domicilio    TEXT NOT NULL,
+          telefono     TEXT,
+          correo       TEXT NOT NULL,
+          menor        INTEGER NOT NULL DEFAULT 0,
+          apoderado    TEXT,
+          tipo_bien    TEXT NOT NULL,
+          monto        TEXT,
+          descripcion  TEXT NOT NULL,
+          tipo_reclamo TEXT NOT NULL,
+          detalle      TEXT NOT NULL,
+          pedido       TEXT NOT NULL,
+          estado       TEXT NOT NULL DEFAULT 'pendiente',
+          respuesta    TEXT,
+          respondido_en TEXT
+        )
+      `);
+
+      // Migración para bases creadas antes de agregar estas columnas.
+      const cols = (
+        await db.execute("PRAGMA table_info(reclamaciones)")
+      ).rows.map((c) => c.name as string);
+      if (!cols.includes("estado"))
+        await db.execute(
+          "ALTER TABLE reclamaciones ADD COLUMN estado TEXT NOT NULL DEFAULT 'pendiente'"
+        );
+      if (!cols.includes("respuesta"))
+        await db.execute("ALTER TABLE reclamaciones ADD COLUMN respuesta TEXT");
+      if (!cols.includes("respondido_en"))
+        await db.execute("ALTER TABLE reclamaciones ADD COLUMN respondido_en TEXT");
+    })();
   }
-  return globalForDb._dlemiliaDb;
+  return globalForDb._dlemiliaReclInit;
 }
 
 export interface ReclamacionInput {
@@ -78,49 +91,59 @@ export interface ReclamacionInput {
 /**
  * Inserta una reclamación y devuelve su correlativo (LR-AÑO-000001).
  */
-export function insertReclamacion(data: ReclamacionInput): { id: number; correlativo: string } {
-  const db = getDb();
+export async function insertReclamacion(
+  data: ReclamacionInput
+): Promise<{ id: number; correlativo: string }> {
+  await ensureSchema();
+  const db = getClient();
   const now = new Date();
   const creadoEn = now.toISOString();
 
-  const insert = db.prepare(`
-    INSERT INTO reclamaciones (
-      correlativo, creado_en, nombre, tipo_doc, num_doc, domicilio, telefono,
-      correo, menor, apoderado, tipo_bien, monto, descripcion, tipo_reclamo, detalle, pedido
-    ) VALUES (
-      @correlativo, @creadoEn, @nombre, @tipoDoc, @numDoc, @domicilio, @telefono,
-      @correo, @menor, @apoderado, @tipoBien, @monto, @descripcion, @tipoReclamo, @detalle, @pedido
-    )
-  `);
-
   // Transacción: reservamos el id y construimos el correlativo con él.
-  const tx = db.transaction((): { id: number; correlativo: string } => {
+  const tx = await db.transaction("write");
+  try {
     const temp = `TMP-${now.getTime()}`;
-    const res = insert.run({
-      correlativo: temp,
-      creadoEn,
-      nombre: data.nombre,
-      tipoDoc: data.tipoDoc,
-      numDoc: data.numDoc,
-      domicilio: data.domicilio,
-      telefono: data.telefono ?? null,
-      correo: data.correo,
-      menor: data.menor ? 1 : 0,
-      apoderado: data.apoderado ?? null,
-      tipoBien: data.tipoBien,
-      monto: data.monto ?? null,
-      descripcion: data.descripcion,
-      tipoReclamo: data.tipoReclamo,
-      detalle: data.detalle,
-      pedido: data.pedido,
+    const res = await tx.execute({
+      sql: `
+        INSERT INTO reclamaciones (
+          correlativo, creado_en, nombre, tipo_doc, num_doc, domicilio, telefono,
+          correo, menor, apoderado, tipo_bien, monto, descripcion, tipo_reclamo, detalle, pedido
+        ) VALUES (
+          @correlativo, @creadoEn, @nombre, @tipoDoc, @numDoc, @domicilio, @telefono,
+          @correo, @menor, @apoderado, @tipoBien, @monto, @descripcion, @tipoReclamo, @detalle, @pedido
+        )
+      `,
+      args: {
+        correlativo: temp,
+        creadoEn,
+        nombre: data.nombre,
+        tipoDoc: data.tipoDoc,
+        numDoc: data.numDoc,
+        domicilio: data.domicilio,
+        telefono: data.telefono ?? null,
+        correo: data.correo,
+        menor: data.menor ? 1 : 0,
+        apoderado: data.apoderado ?? null,
+        tipoBien: data.tipoBien,
+        monto: data.monto ?? null,
+        descripcion: data.descripcion,
+        tipoReclamo: data.tipoReclamo,
+        detalle: data.detalle,
+        pedido: data.pedido,
+      },
     });
     const id = Number(res.lastInsertRowid);
     const correlativo = `LR-${now.getFullYear()}-${String(id).padStart(6, "0")}`;
-    db.prepare("UPDATE reclamaciones SET correlativo = ? WHERE id = ?").run(correlativo, id);
+    await tx.execute({
+      sql: "UPDATE reclamaciones SET correlativo = ? WHERE id = ?",
+      args: [correlativo, id],
+    });
+    await tx.commit();
     return { id, correlativo };
-  });
-
-  return tx();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
 }
 
 export interface ReclamacionRow {
@@ -146,21 +169,26 @@ export interface ReclamacionRow {
   respondido_en: string | null;
 }
 
-export function getAllReclamaciones(): ReclamacionRow[] {
-  return getDb()
-    .prepare("SELECT * FROM reclamaciones ORDER BY id DESC")
-    .all() as ReclamacionRow[];
+export async function getAllReclamaciones(): Promise<ReclamacionRow[]> {
+  await ensureSchema();
+  const res = await getClient().execute(
+    "SELECT * FROM reclamaciones ORDER BY id DESC"
+  );
+  return res.rows as unknown as ReclamacionRow[];
 }
 
 /**
  * Registra la respuesta del proveedor (Sección 4 del formato oficial)
  * y marca la reclamación como atendida.
  */
-export function updateRespuesta(id: number, respuesta: string): boolean {
-  const res = getDb()
-    .prepare(
-      "UPDATE reclamaciones SET respuesta = ?, respondido_en = ?, estado = 'atendido' WHERE id = ?"
-    )
-    .run(respuesta, new Date().toISOString(), id);
-  return res.changes > 0;
+export async function updateRespuesta(
+  id: number,
+  respuesta: string
+): Promise<boolean> {
+  await ensureSchema();
+  const res = await getClient().execute({
+    sql: "UPDATE reclamaciones SET respuesta = ?, respondido_en = ?, estado = 'atendido' WHERE id = ?",
+    args: [respuesta, new Date().toISOString(), id],
+  });
+  return res.rowsAffected > 0;
 }

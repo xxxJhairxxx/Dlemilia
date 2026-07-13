@@ -1,4 +1,4 @@
-import { getDb } from "./db";
+import { getClient } from "./db";
 import {
   empanadas as seedEmpanadas,
   tortas as seedTortas,
@@ -8,7 +8,7 @@ import type { Product } from "@/types/Product";
 
 /**
  * Capa CMS: productos editables y contenido de texto por secciones.
- * Comparte la conexión SQLite con el módulo de reclamaciones.
+ * Comparte la conexión libSQL/Turso con el módulo de reclamaciones.
  */
 
 export type Categoria = "torta" | "empanada" | "mas";
@@ -33,9 +33,11 @@ interface ProductoRow {
   visible: number;
 }
 
-function ensureSchema() {
-  const db = getDb();
-  db.exec(`
+const globalForCms = globalThis as unknown as { _dlemiliaCmsInit?: Promise<void> };
+
+async function ensureSchema(): Promise<void> {
+  const db = getClient();
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS productos (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       slug        TEXT NOT NULL UNIQUE,
@@ -47,11 +49,13 @@ function ensureSchema() {
       variedades  TEXT,
       orden       INTEGER NOT NULL DEFAULT 0,
       visible     INTEGER NOT NULL DEFAULT 1
-    );
+    )
+  `);
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS contenido (
       clave TEXT PRIMARY KEY,
       valor TEXT NOT NULL DEFAULT ''
-    );
+    )
   `);
 }
 
@@ -96,52 +100,76 @@ export const CONTENIDO_DEFAULT: Record<string, string> = {
   cat_img_mas: "/tortas/tartaletas-fresa.webp",
 };
 
-function ensureSeed() {
-  const db = getDb();
-  const nProd = (db.prepare("SELECT COUNT(*) c FROM productos").get() as { c: number }).c;
+async function ensureSeed(): Promise<void> {
+  const db = getClient();
+  const nProd = Number(
+    (await db.execute("SELECT COUNT(*) c FROM productos")).rows[0].c
+  );
   if (nProd === 0) {
-    const stmt = db.prepare(`
-      INSERT INTO productos (slug, nombre, descripcion, precio, categoria, imagen, variedades, orden)
-      VALUES (@slug, @nombre, @descripcion, @precio, @categoria, @imagen, @variedades, @orden)
-    `);
     const seedAll: { arr: Product[]; categoria: Categoria }[] = [
       { arr: seedTortas, categoria: "torta" },
       { arr: seedEmpanadas, categoria: "empanada" },
       { arr: seedMas, categoria: "mas" },
     ];
-    const tx = db.transaction(() => {
+    const tx = await db.transaction("write");
+    try {
       let orden = 0;
       for (const { arr, categoria } of seedAll) {
         for (const p of arr) {
-          stmt.run({
-            slug: p.id,
-            nombre: p.name,
-            descripcion: p.description,
-            precio: p.price,
-            categoria,
-            imagen: p.image,
-            variedades: p.varieties?.join(", ") ?? null,
-            orden: orden++,
+          await tx.execute({
+            sql: `
+              INSERT INTO productos (slug, nombre, descripcion, precio, categoria, imagen, variedades, orden)
+              VALUES (@slug, @nombre, @descripcion, @precio, @categoria, @imagen, @variedades, @orden)
+            `,
+            args: {
+              slug: p.id,
+              nombre: p.name,
+              descripcion: p.description,
+              precio: p.price,
+              categoria,
+              imagen: p.image,
+              variedades: p.varieties?.join(", ") ?? null,
+              orden: orden++,
+            },
           });
         }
       }
-    });
-    tx();
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
   }
 
-  const nCont = (db.prepare("SELECT COUNT(*) c FROM contenido").get() as { c: number }).c;
+  const nCont = Number(
+    (await db.execute("SELECT COUNT(*) c FROM contenido")).rows[0].c
+  );
   if (nCont === 0) {
-    const stmt = db.prepare("INSERT INTO contenido (clave, valor) VALUES (?, ?)");
-    const tx = db.transaction(() => {
-      for (const [k, v] of Object.entries(CONTENIDO_DEFAULT)) stmt.run(k, v);
-    });
-    tx();
+    const tx = await db.transaction("write");
+    try {
+      for (const [k, v] of Object.entries(CONTENIDO_DEFAULT)) {
+        await tx.execute({
+          sql: "INSERT INTO contenido (clave, valor) VALUES (?, ?)",
+          args: [k, v],
+        });
+      }
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
   }
 }
 
-function init() {
-  ensureSchema();
-  ensureSeed();
+/** Inicializa esquema y semilla una sola vez por instancia. */
+function init(): Promise<void> {
+  if (!globalForCms._dlemiliaCmsInit) {
+    globalForCms._dlemiliaCmsInit = (async () => {
+      await ensureSchema();
+      await ensureSeed();
+    })();
+  }
+  return globalForCms._dlemiliaCmsInit;
 }
 
 function mapRow(r: ProductoRow): ProductoCMS {
@@ -164,22 +192,24 @@ function mapRow(r: ProductoRow): ProductoCMS {
 
 /* ---------- Lectura (sitio público) ---------- */
 
-export function getProductosPorCategoria(categoria: Categoria): ProductoCMS[] {
-  init();
-  const rows = getDb()
-    .prepare(
-      "SELECT * FROM productos WHERE categoria = ? AND visible = 1 ORDER BY orden, id"
-    )
-    .all(categoria) as ProductoRow[];
+export async function getProductosPorCategoria(
+  categoria: Categoria
+): Promise<ProductoCMS[]> {
+  await init();
+  const rows = (
+    await getClient().execute({
+      sql: "SELECT * FROM productos WHERE categoria = ? AND visible = 1 ORDER BY orden, id",
+      args: [categoria],
+    })
+  ).rows as unknown as ProductoRow[];
   return rows.map(mapRow);
 }
 
-export function getContenido(): Record<string, string> {
-  init();
-  const rows = getDb().prepare("SELECT clave, valor FROM contenido").all() as {
-    clave: string;
-    valor: string;
-  }[];
+export async function getContenido(): Promise<Record<string, string>> {
+  await init();
+  const rows = (
+    await getClient().execute("SELECT clave, valor FROM contenido")
+  ).rows as unknown as { clave: string; valor: string }[];
   const map: Record<string, string> = { ...CONTENIDO_DEFAULT };
   for (const r of rows) map[r.clave] = r.valor;
   return map;
@@ -189,11 +219,13 @@ export function getContenido(): Record<string, string> {
 
 export interface ProductoAdminRow extends ProductoRow {}
 
-export function getTodosLosProductos(): ProductoAdminRow[] {
-  init();
-  return getDb()
-    .prepare("SELECT * FROM productos ORDER BY categoria, orden, id")
-    .all() as ProductoAdminRow[];
+export async function getTodosLosProductos(): Promise<ProductoAdminRow[]> {
+  await init();
+  return (
+    await getClient().execute(
+      "SELECT * FROM productos ORDER BY categoria, orden, id"
+    )
+  ).rows as unknown as ProductoAdminRow[];
 }
 
 export interface ProductoInput {
@@ -209,58 +241,70 @@ export interface ProductoInput {
   visible?: number;
 }
 
-export function upsertProducto(p: ProductoInput): void {
-  init();
-  const db = getDb();
+export async function upsertProducto(p: ProductoInput): Promise<void> {
+  await init();
+  const db = getClient();
   if (p.id) {
-    db.prepare(
-      `UPDATE productos SET slug=@slug, nombre=@nombre, descripcion=@descripcion,
+    await db.execute({
+      sql: `UPDATE productos SET slug=@slug, nombre=@nombre, descripcion=@descripcion,
        precio=@precio, categoria=@categoria, imagen=@imagen, variedades=@variedades,
-       visible=@visible WHERE id=@id`
-    ).run({
-      id: p.id,
-      slug: p.slug,
-      nombre: p.nombre,
-      descripcion: p.descripcion,
-      precio: p.precio,
-      categoria: p.categoria,
-      imagen: p.imagen,
-      variedades: p.variedades ?? null,
-      visible: p.visible ?? 1,
+       visible=@visible WHERE id=@id`,
+      args: {
+        id: p.id,
+        slug: p.slug,
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        precio: p.precio,
+        categoria: p.categoria,
+        imagen: p.imagen,
+        variedades: p.variedades ?? null,
+        visible: p.visible ?? 1,
+      },
     });
   } else {
-    const maxOrden =
-      (db.prepare("SELECT MAX(orden) m FROM productos").get() as { m: number | null }).m ?? 0;
-    db.prepare(
-      `INSERT INTO productos (slug, nombre, descripcion, precio, categoria, imagen, variedades, orden, visible)
-       VALUES (@slug, @nombre, @descripcion, @precio, @categoria, @imagen, @variedades, @orden, @visible)`
-    ).run({
-      slug: p.slug,
-      nombre: p.nombre,
-      descripcion: p.descripcion,
-      precio: p.precio,
-      categoria: p.categoria,
-      imagen: p.imagen,
-      variedades: p.variedades ?? null,
-      orden: maxOrden + 1,
-      visible: p.visible ?? 1,
+    const maxOrden = Number(
+      (await db.execute("SELECT MAX(orden) m FROM productos")).rows[0].m ?? 0
+    );
+    await db.execute({
+      sql: `INSERT INTO productos (slug, nombre, descripcion, precio, categoria, imagen, variedades, orden, visible)
+       VALUES (@slug, @nombre, @descripcion, @precio, @categoria, @imagen, @variedades, @orden, @visible)`,
+      args: {
+        slug: p.slug,
+        nombre: p.nombre,
+        descripcion: p.descripcion,
+        precio: p.precio,
+        categoria: p.categoria,
+        imagen: p.imagen,
+        variedades: p.variedades ?? null,
+        orden: maxOrden + 1,
+        visible: p.visible ?? 1,
+      },
     });
   }
 }
 
-export function deleteProducto(id: number): void {
-  init();
-  getDb().prepare("DELETE FROM productos WHERE id = ?").run(id);
+export async function deleteProducto(id: number): Promise<void> {
+  await init();
+  await getClient().execute({
+    sql: "DELETE FROM productos WHERE id = ?",
+    args: [id],
+  });
 }
 
-export function setContenido(entries: Record<string, string>): void {
-  init();
-  const db = getDb();
-  const stmt = db.prepare(
-    "INSERT INTO contenido (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor"
-  );
-  const tx = db.transaction(() => {
-    for (const [k, v] of Object.entries(entries)) stmt.run(k, v);
-  });
-  tx();
+export async function setContenido(entries: Record<string, string>): Promise<void> {
+  await init();
+  const db = getClient();
+  const tx = await db.transaction("write");
+  try {
+    for (const [k, v] of Object.entries(entries)) {
+      await tx.execute({
+        sql: "INSERT INTO contenido (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+        args: [k, v],
+      });
+    }
+    await tx.commit();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  }
 }

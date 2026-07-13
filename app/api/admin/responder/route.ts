@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Datos incompletos." }, { status: 400 });
   }
 
-  const ok = updateRespuesta(id, respuesta);
+  const ok = await updateRespuesta(id, respuesta);
   if (!ok) {
     return NextResponse.json({ error: "No se encontró la reclamación." }, { status: 404 });
   }

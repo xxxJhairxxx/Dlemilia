@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { correlativo } = insertReclamacion({
+    const { correlativo } = await insertReclamacion({
       nombre: body.nombre!.trim(),
       tipoDoc: body.tipoDoc?.trim() || "DNI",
       numDoc: body.numDoc!.trim(),

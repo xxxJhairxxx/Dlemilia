@@ -20,6 +20,6 @@ export async function POST(request: Request) {
   }
   const clean: Record<string, string> = {};
   for (const [k, v] of Object.entries(body.entries)) clean[k] = String(v ?? "");
-  setContenido(clean);
+  await setContenido(clean);
   return NextResponse.json({ ok: true });
 }

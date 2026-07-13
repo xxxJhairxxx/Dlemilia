@@ -14,11 +14,11 @@ import { getContenido, getProductosPorCategoria } from "@/lib/cms";
 
 export const dynamic = "force-dynamic";
 
-export default function Home() {
-  const c = getContenido();
-  const tortas = getProductosPorCategoria("torta");
-  const mas = getProductosPorCategoria("mas");
-  const empanada = getProductosPorCategoria("empanada")[0] ?? null;
+export default async function Home() {
+  const c = await getContenido();
+  const tortas = await getProductosPorCategoria("torta");
+  const mas = await getProductosPorCategoria("mas");
+  const empanada = (await getProductosPorCategoria("empanada"))[0] ?? null;
 
   return (
     <WhatsAppProvider numero={c.contacto_whatsapp} display={c.contacto_telefono}>
