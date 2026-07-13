@@ -11,9 +11,10 @@
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
+    "eslint-config-next": "^15.5.20",
     "framer-motion": "^11.11.17",
     "lucide-react": "^0.468.0",
-    "next": "15.1.6",
+    "next": "^15.5.20",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
