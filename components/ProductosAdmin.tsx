@@ -69,8 +69,9 @@ export default function ProductosAdmin({ productos }: { productos: ProductoAdmin
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Error al subir la imagen.");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.path)
+        throw new Error(data?.error || "No se pudo subir la imagen (¿archivo muy grande?).");
       setForm((f) => (f ? { ...f, imagen: data.path } : f));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al subir la imagen.");
